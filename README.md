@@ -1,2 +1,2 @@
-# git-frontend
+# gis-frontend
 GIS database project 
