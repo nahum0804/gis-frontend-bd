@@ -1,52 +1,42 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, Pane } from 'react-leaflet';
-import { getRoads, getETA } from '../api/transportApi';
+import { getETA, getRoads } from '../api/transportApi';
+import { getRouteColor } from '../utils/colors';
 import type { RoadFeatureCollection } from '../api/transportApi';
 
-export default function RoutesViewer() {
+interface Props { selectedRoute?: number; }
+
+export default function RoutesViewer({ selectedRoute }: Props) {
   const [roads, setRoads] = useState<RoadFeatureCollection | null>(null);
-  const [pos, setPos] = useState<[number, number] | null>(null);
   const [etaMsg, setEtaMsg] = useState('');
-
-  useEffect(() => {
-    getRoads().then(setRoads).catch(console.error);
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => setPos([coords.latitude, coords.longitude]),
-      console.error
+  useEffect(() => { getRoads().then(setRoads).catch(console.error); }, []);
+  const handleClick = async (props: any, layer: any) => {
+    const userPos = await new Promise<[number,number]>((res,rej) =>
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => res([coords.latitude, coords.longitude]),
+        rej
+      )
     );
-  }, []);
-
-  const onFeatureClick = async (props: any, layer: any) => {
-    if (!pos) return;
-    const e = await getETA(props.f1, pos[0], pos[1]);
-    setEtaMsg(`ETA ruta ${props.f1}: ${e.toFixed(0)} min`);
+    const e = await getETA(props.f1, userPos[0], userPos[1]);
+    setEtaMsg(`ETA ${props.f2}: ${e.toFixed(0)} min`);
     layer.openPopup();
   };
-
   return (
-    <div style={{ height: '100vh' }}>
-      <MapContainer center={[10.36, -84.51]} zoom={14} style={{ height: '100%' }}>
+    <div style={{ height: '100vh', position: 'relative' }}>
+      <MapContainer center={[10.3420, -84.2400]} zoom={12} style={{ height: '100%' }}>
         <Pane name="highlight" style={{ zIndex: 650 }} />
-        <TileLayer url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' />
+        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; CartoDB" />
         {roads && (
           <GeoJSON
-            data={roads}
-            style={() => ({
-              color: 'crimson',       
-              weight: 8,              
-              opacity: 0.75,         
-              dashArray: '10,6',      
-            })}
-            onEachFeature={(feat, lyr) => {
-              lyr.setStyle({ interactive: true, pane: 'overlayPane' });
-              lyr.on({ click: () => onFeatureClick(feat.properties, lyr) });
-              lyr.bindPopup(`<b>ID:</b> ${feat.properties.f1}`);
-            }}
+            data={selectedRoute
+              ? { type: 'FeatureCollection', features: roads.features.filter(f => f.properties.f1 === selectedRoute) }
+              : roads}
+            style={feat => ({ color: getRouteColor(feat.properties.f1), weight: 8, opacity: 0.75 })}
+            onEachFeature={(feat, lyr) => { lyr.on({ click: () => handleClick(feat.properties, lyr) }); lyr.bindPopup(`<b>${feat.properties.f2}</b>`); }}
           />
         )}
-        {pos && <Marker position={pos}><Popup>Tu ubicación</Popup></Marker>}
       </MapContainer>
-      {etaMsg && <div style={{position:'absolute', top:10,left:10, background:'#fff', padding:8}}>{etaMsg}</div>}
+      {etaMsg && <div className="eta-popup">{etaMsg}</div>}
     </div>
   );
 }
