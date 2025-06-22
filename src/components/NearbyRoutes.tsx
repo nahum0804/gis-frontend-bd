@@ -9,13 +9,33 @@ export default function NearbyRoutes({ onSelect }: { onSelect: (route: RouteInfo
   const [roads, setRoads] = useState<RoadFeatureCollection | null>(null);
   const [pos, setPos] = useState<[number, number] | null>(null);
   const [nearby, setNearby] = useState<RouteInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  // 1) Carga de rutas y manejo de errores
   useEffect(() => {
-    getRoads().then(setRoads).catch(console.error);
+    getRoads()
+      .then(r => {
+        setRoads(r);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+        setError(true);
+      });
+
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => setPos([coords.latitude, coords.longitude]),
-      console.error
+      err => {
+        console.error(err);
+        setPos(null);
+      },
+      { enableHighAccuracy: true }
     );
   }, []);
+
+  // 2) Filtrado de rutas cercanas cuando ya tengamos rutas y posición
   useEffect(() => {
     if (!roads || !pos) return;
     const list = roads.features
@@ -23,9 +43,24 @@ export default function NearbyRoutes({ onSelect }: { onSelect: (route: RouteInfo
       .map(f => ({ id: f.properties.f1, name: f.properties.f2 }));
     setNearby(list);
   }, [roads, pos]);
-  if (!pos) return <p>Cargando ubicación...</p>;
-  if (!roads) return <p>Cargando rutas...</p>;
-  if (nearby.length === 0) return <p>No hay rutas cerca de ti.</p>;
+
+  // 3) Renderizado según estado
+  if (!pos) {
+    return <p>Cargando ubicación...</p>;
+  }
+
+  if (loading) {
+    return <p>Cargando rutas...</p>;
+  }
+
+  if (error) {
+    return <p>Error al cargar rutas. Intenta recargar la página.</p>;
+  }
+
+  if (nearby.length === 0) {
+    return <p>No se encontraron rutas cerca de ti.</p>;
+  }
+
   return (
     <div>
       <h3>Rutas cercanas</h3>
