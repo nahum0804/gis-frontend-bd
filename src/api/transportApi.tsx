@@ -19,6 +19,13 @@ export interface Stop {
   coordinate: [number, number];
 }
 
+export interface Prediction {
+  vehiculo_id: number;
+  parada_objetivo: string;
+  distancia_metros: number;
+  eta_minutos: number;
+}
+
 const BASE = 'http://127.0.0.1:8000/api';
 
 // Rutas: convierte WKT a GeoJSON
@@ -105,4 +112,10 @@ export async function getETA(vehicleId: string): Promise<number> {
   if (!res.ok) throw new Error(res.statusText);
   const json = (await res.json()) as { eta_minutos: number };
   return json.eta_minutos;
+}
+
+export async function getPrediction(vehicleId: number): Promise<Prediction> {
+  const res = await fetch(`${BASE}/vehiculos/${vehicleId}/prediccion/`);
+  if (!res.ok) throw new Error(res.statusText);
+  return res.json() as Promise<Prediction>;
 }
